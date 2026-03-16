@@ -3,12 +3,22 @@
 namespace App\Controllers\Api\V1;
 
 use App\Models\BranchModel;
+use App\Services\AuthorizationService;
 use CodeIgniter\HTTP\ResponseInterface;
 
 class BranchController extends BaseApiController
 {
     public function index()
     {
+        $session = service('session');
+        $actorUserId = (int) ($session->get('user_id') ?? 0);
+        $actorRole = strtoupper((string) ($session->get('role') ?? ''));
+        $actorBranchId = (int) ($session->get('branch_id') ?? 0);
+
+        if ($actorUserId <= 0 || $actorRole === '') {
+            return $this->failMessage('Unauthorized', ResponseInterface::HTTP_UNAUTHORIZED);
+        }
+
         $page = max(1, (int)($this->request->getGet('page') ?? 1));
         $perPage = (int)($this->request->getGet('per_page') ?? 50);
         $perPage = max(1, min(100, $perPage));
@@ -23,6 +33,22 @@ class BranchController extends BaseApiController
                 ->orLike('address', $q)
                 ->groupEnd();
         }
+
+        // Role-based scoping:
+        // - ADMIN/SUPER_ADMIN: all branches
+        // - BRANCH_MANAGER: only the branch they manage
+        // - SALES: only their assigned branch
+        if ($actorRole === 'BRANCH_MANAGER') {
+            $countBuilder->where('manager_id', $actorUserId);
+        } elseif ($actorRole === 'SALES') {
+            if ($actorBranchId <= 0) {
+                return $this->failMessage('Forbidden', ResponseInterface::HTTP_FORBIDDEN);
+            }
+            $countBuilder->where('id', $actorBranchId);
+        } elseif ($actorRole !== 'ADMIN' && $actorRole !== 'SUPER_ADMIN') {
+            return $this->failMessage('Forbidden', ResponseInterface::HTTP_FORBIDDEN);
+        }
+
         $total = (int)$countBuilder->countAllResults();
 
         $builder = $db->table('branches');
@@ -33,6 +59,13 @@ class BranchController extends BaseApiController
                 ->orLike('address', $q)
                 ->groupEnd();
         }
+
+        if ($actorRole === 'BRANCH_MANAGER') {
+            $builder->where('manager_id', $actorUserId);
+        } elseif ($actorRole === 'SALES') {
+            $builder->where('id', $actorBranchId);
+        }
+
         $builder->orderBy('id', 'DESC');
         $builder->limit($perPage, ($page - 1) * $perPage);
 
@@ -56,6 +89,19 @@ class BranchController extends BaseApiController
         $branchId = (int)$id;
         if ($branchId <= 0) {
             return $this->failMessage('Invalid branch id');
+        }
+
+        $session = service('session');
+        $actorUserId = (int) ($session->get('user_id') ?? 0);
+        $actorRole = (string) ($session->get('role') ?? '');
+        if ($actorUserId <= 0) {
+            return $this->failMessage('Unauthorized', ResponseInterface::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            (new AuthorizationService(db_connect()))->assertCanViewBranch($actorUserId, $actorRole, $branchId);
+        } catch (\Throwable $e) {
+            return $this->failMessage('Forbidden', ResponseInterface::HTTP_FORBIDDEN);
         }
 
         $model = new BranchModel();

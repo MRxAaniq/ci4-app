@@ -99,6 +99,30 @@ final class ImsApiSmokeFeatureTest extends CIUnitTestCase
         ]);
     }
 
+    public function testBranchesIndexAsManagerIsScopedToManagedBranch(): void
+    {
+        $result = $this
+            ->withSession(['user_id' => 2, 'role' => 'BRANCH_MANAGER', 'branch_id' => 0])
+            ->get('api/v1/branches');
+
+        $result->assertStatus(200);
+
+        $json = json_decode((string) $result->response()->getBody(), true);
+        $this->assertIsArray($json);
+
+        $branches = $json['data']['branches'] ?? null;
+        $this->assertIsArray($branches);
+        $this->assertCount(1, $branches);
+        $this->assertSame(10, (int) ($branches[0]['id'] ?? 0));
+
+        // Manager cannot view other branches
+        $forbidden = $this
+            ->withSession(['user_id' => 2, 'role' => 'BRANCH_MANAGER', 'branch_id' => 0])
+            ->get('api/v1/branches/20');
+
+        $forbidden->assertStatus(403);
+    }
+
     public function testProductsIndexAndCrud(): void
     {
         // Index
