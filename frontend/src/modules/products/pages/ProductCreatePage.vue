@@ -17,10 +17,6 @@
         <label>Name</label>
         <input v-model.trim="form.name" placeholder="Product name" />
       </div>
-      <div class="field">
-        <label>SKU</label>
-        <input v-model.trim="form.sku" placeholder="SKU-001" />
-      </div>
       <div class="grid2">
         <div class="field">
           <label>Cost Price</label>
@@ -66,7 +62,6 @@ const error = ref('');
 
 const form = reactive({
   name: '',
-  sku: '',
   cost: '',
   sale: '',
   tax: '0',
@@ -84,7 +79,6 @@ async function onCreate() {
   try {
     await productsController.create({
       name: form.name,
-      sku: form.sku,
       cost_price: num(form.cost),
       sale_price: num(form.sale),
       tax_percentage: num(form.tax),

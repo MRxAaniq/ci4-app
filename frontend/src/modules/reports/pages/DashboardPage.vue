@@ -1,15 +1,18 @@
 <template>
-  <div class="row" style="margin-bottom: 14px;">
+  <div class="row" style="margin-bottom: 14px; align-items: flex-end;">
     <div>
       <div class="h1">Dashboard</div>
-      <div class="muted" style="font-size: 13px; margin-top: 4px;">Sales + top products + low stock</div>
+      <div class="muted" style="font-size: 13px; margin-top: 4px;">Sales, top products, low stock</div>
     </div>
 
     <div style="display: flex; gap: 10px; align-items: center;">
-      <select v-model.number="branchId" style="min-width: 240px;" :disabled="branchesLoading || branches.length === 0">
-        <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
-      </select>
-      <button class="btn" :disabled="loading" @click="load">Refresh</button>
+      <div>
+        <div class="muted" style="font-size: 12px; margin-bottom: 4px;">Branch</div>
+        <select v-model.number="branchId" style="min-width: 260px;" :disabled="branchesLoading || branches.length === 0 || branchLocked">
+          <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
+        </select>
+      </div>
+      <button class="btn" :disabled="loading || branchesLoading || !branchId" @click="load">Refresh</button>
     </div>
   </div>
 
@@ -17,25 +20,30 @@
 
   <div class="grid2">
     <div class="card">
-      <div class="h2" style="margin-bottom: 10px;">Totals</div>
+      <div class="row" style="margin-bottom: 10px;">
+        <div>
+          <div class="h2">Totals</div>
+          <div class="muted" style="font-size: 12px; margin-top: 2px;">For selected branch</div>
+        </div>
+      </div>
 
       <div v-if="loading" class="muted">Loading…</div>
       <div v-else class="form">
         <div class="row">
           <div class="muted">Sales (Today)</div>
-          <div style="font-weight: 700;">{{ stats?.sales_today ?? 0 }}</div>
+          <div style="font-weight: 700;">{{ money(stats?.sales_today ?? 0) }}</div>
         </div>
         <div class="row">
           <div class="muted">Sales (This Month)</div>
-          <div style="font-weight: 700;">{{ stats?.sales_month ?? 0 }}</div>
+          <div style="font-weight: 700;">{{ money(stats?.sales_month ?? 0) }}</div>
         </div>
         <div class="row">
           <div class="muted">Orders (This Month)</div>
-          <div style="font-weight: 700;">{{ stats?.orders_month ?? 0 }}</div>
+          <div style="font-weight: 700;">{{ int(stats?.orders_month ?? 0) }}</div>
         </div>
         <div class="row">
           <div class="muted">Orders (Total)</div>
-          <div style="font-weight: 700;">{{ stats?.orders_total ?? 0 }}</div>
+          <div style="font-weight: 700;">{{ int(stats?.orders_total ?? 0) }}</div>
         </div>
       </div>
     </div>
@@ -93,7 +101,7 @@
           <td>{{ r.name }}</td>
           <td class="muted">{{ r.sku }}</td>
           <td>{{ r.qty_sold }}</td>
-          <td>{{ r.revenue }}</td>
+          <td>{{ money(r.revenue) }}</td>
         </tr>
         <tr v-if="!loading && topProducts.length === 0">
           <td colspan="4" class="muted">No sales yet.</td>
@@ -127,6 +135,18 @@ const lowStockItems = ref<LowStockRow[]>([]);
 const lowStockThreshold = ref(10);
 
 const isManager = computed(() => auth.user?.role === 'BRANCH_MANAGER');
+const branchLocked = computed(() => isManager.value && branchId.value > 0);
+
+function money(v: any): string {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '0.00';
+  return n.toFixed(2);
+}
+
+function int(v: any): string {
+  const n = Number.parseInt(String(v ?? 0), 10);
+  return Number.isFinite(n) ? String(n) : '0';
+}
 
 async function loadBranches() {
   branchesLoading.value = true;
@@ -135,12 +155,7 @@ async function loadBranches() {
     branches.value = res.items;
 
     if (!branchId.value) {
-      if (isManager.value && auth.user) {
-        const managed = branches.value.find((b) => b.manager_id === auth.user?.id);
-        branchId.value = managed?.id || branches.value[0]?.id || 0;
-      } else {
-        branchId.value = branches.value[0]?.id || 0;
-      }
+      branchId.value = branches.value[0]?.id || 0;
     }
   } finally {
     branchesLoading.value = false;
@@ -153,10 +168,10 @@ async function load() {
 
   loading.value = true;
   try {
-    const data = await reportsController.getBranchDashboard(branchId.value, { low_stock_threshold: lowStockThreshold.value });
-    stats.value = data.stats;
-    topProducts.value = data.top_products;
-    lowStockItems.value = data.low_stock_items;
+    const branchData = await reportsController.getBranchDashboard(branchId.value, { low_stock_threshold: lowStockThreshold.value });
+    stats.value = branchData.stats;
+    topProducts.value = branchData.top_products;
+    lowStockItems.value = branchData.low_stock_items;
   } catch (e: any) {
     error.value = e?.message || 'Failed to load dashboard';
     stats.value = null;

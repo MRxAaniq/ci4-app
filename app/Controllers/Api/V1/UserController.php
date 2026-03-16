@@ -8,6 +8,88 @@ use CodeIgniter\HTTP\ResponseInterface;
 
 class UserController extends BaseApiController
 {
+    public function index()
+    {
+        $page = max(1, (int)($this->request->getGet('page') ?? 1));
+        $perPage = (int)($this->request->getGet('per_page') ?? 50);
+        $perPage = max(1, min(200, $perPage));
+
+        $q = trim((string)($this->request->getGet('q') ?? ''));
+        $role = strtoupper(trim((string)($this->request->getGet('role') ?? '')));
+        $status = strtoupper(trim((string)($this->request->getGet('status') ?? 'ACTIVE')));
+
+        $allowedRoles = ['ADMIN', 'SUPER_ADMIN', 'BRANCH_MANAGER', 'SALES'];
+        if ($role !== '' && !in_array($role, $allowedRoles, true)) {
+            return $this->failMessage('Invalid role');
+        }
+
+        $allowedStatuses = ['ACTIVE', 'DISABLED'];
+        if ($status !== '' && !in_array($status, $allowedStatuses, true)) {
+            return $this->failMessage('Invalid status');
+        }
+
+        $db = db_connect();
+
+        $countBuilder = $db->table('users');
+        if ($role !== '') {
+            $countBuilder->where('role', $role);
+        }
+        if ($status !== '') {
+            $countBuilder->where('status', $status);
+        }
+        if ($q !== '') {
+            $countBuilder->groupStart()
+                ->like('name', $q)
+                ->orLike('email', $q)
+                ->groupEnd();
+        }
+        $total = (int) $countBuilder->countAllResults();
+
+        $builder = $db->table('users');
+        $builder->select('id, name, email, role, branch_id, status');
+        if ($role !== '') {
+            $builder->where('role', $role);
+        }
+        if ($status !== '') {
+            $builder->where('status', $status);
+        }
+        if ($q !== '') {
+            $builder->groupStart()
+                ->like('name', $q)
+                ->orLike('email', $q)
+                ->groupEnd();
+        }
+        $builder->orderBy('id', 'DESC');
+        $builder->limit($perPage, ($page - 1) * $perPage);
+
+        $rows = $builder->get()->getResultArray();
+        $safe = array_map(static function (array $r): array {
+            return [
+                'id' => (int)($r['id'] ?? 0),
+                'name' => (string)($r['name'] ?? ''),
+                'email' => (string)($r['email'] ?? ''),
+                'role' => (string)($r['role'] ?? ''),
+                'branch_id' => (int)($r['branch_id'] ?? 0),
+                'status' => (string)($r['status'] ?? ''),
+            ];
+        }, $rows);
+
+        $totalPages = $perPage > 0 ? (int)ceil($total / $perPage) : 1;
+
+        return $this->ok([
+            'users' => $safe,
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $totalPages,
+                'q' => $q,
+                'role' => $role,
+                'status' => $status,
+            ],
+        ]);
+    }
+
     public function create()
     {
         if ($resp = $this->guardRequestSize(65536)) {

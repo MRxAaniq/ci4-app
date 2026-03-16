@@ -27,8 +27,12 @@
           <input v-model.trim="create.address" placeholder="City, Street…" />
         </div>
         <div class="field">
-          <label>Manager ID (optional)</label>
-          <input v-model.trim="create.managerId" placeholder="e.g. 2" />
+          <label>Manager Name (optional)</label>
+          <input v-model.trim="create.managerName" placeholder="e.g. John Smith" />
+        </div>
+        <div class="field">
+          <label>Manager Email (optional)</label>
+          <input v-model.trim="create.managerEmail" placeholder="manager@example.com" />
         </div>
         <div class="field">
           <label>Status</label>
@@ -89,8 +93,12 @@
             <input v-model.trim="edit.address" />
           </div>
           <div class="field">
-            <label>Manager ID (optional)</label>
-            <input v-model.trim="edit.managerId" />
+            <label>Manager Name (optional)</label>
+            <input v-model.trim="edit.managerName" />
+          </div>
+          <div class="field">
+            <label>Manager Email (optional)</label>
+            <input v-model.trim="edit.managerEmail" />
           </div>
           <div class="field">
             <label>Status</label>
@@ -122,7 +130,8 @@ const error = ref('');
 const create = reactive({
   name: '',
   address: '',
-  managerId: '',
+  managerName: '',
+  managerEmail: '',
   status: 'ACTIVE' as Branch['status'],
 });
 
@@ -130,14 +139,10 @@ const editing = ref<Branch | null>(null);
 const edit = reactive({
   name: '',
   address: '',
-  managerId: '',
+  managerName: '',
+  managerEmail: '',
   status: 'ACTIVE' as Branch['status'],
 });
-
-function parseManagerId(v: string): number | undefined {
-  const n = Number.parseInt(v, 10);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-}
 
 async function load() {
   error.value = '';
@@ -159,12 +164,14 @@ async function onCreate() {
     await branchesController.create({
       name: create.name,
       address: create.address,
-      manager_id: parseManagerId(create.managerId),
+      manager_name: create.managerName.trim() || undefined,
+      manager_email: create.managerEmail.trim() || undefined,
       status: create.status,
     });
     create.name = '';
     create.address = '';
-    create.managerId = '';
+    create.managerName = '';
+    create.managerEmail = '';
     create.status = 'ACTIVE';
     await load();
   } catch (e: any) {
@@ -178,7 +185,8 @@ function startEdit(b: Branch) {
   editing.value = b;
   edit.name = b.name;
   edit.address = b.address;
-  edit.managerId = b.manager_id ? String(b.manager_id) : '';
+  edit.managerName = (b.manager_name as string) || '';
+  edit.managerEmail = (b.manager_email as string) || '';
   edit.status = b.status;
 }
 
@@ -189,12 +197,14 @@ function cancelEdit() {
 async function onUpdate() {
   if (!editing.value) return;
   error.value = '';
+  if (!confirm('Save changes to this branch?')) return;
   loading.value = true;
   try {
     await branchesController.update(editing.value.id, {
       name: edit.name,
       address: edit.address,
-      manager_id: parseManagerId(edit.managerId),
+      manager_name: edit.managerName.trim() || undefined,
+      manager_email: edit.managerEmail.trim() || undefined,
       status: edit.status,
     });
     editing.value = null;

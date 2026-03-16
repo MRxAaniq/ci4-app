@@ -8,14 +8,14 @@
 
       <nav class="nav">
         <RouterLink v-if="canAny(['ADMIN','BRANCH_MANAGER'])" to="/app/dashboard" active-class="active">Dashboard</RouterLink>
-        <RouterLink to="/app/inventory" active-class="active">Inventory</RouterLink>
-        <RouterLink v-if="canAny(['ADMIN','BRANCH_MANAGER'])" to="/app/inventory/movements" active-class="active">Movements</RouterLink>
-        <RouterLink v-if="can('ADMIN')" to="/app/branches" active-class="active">Branches</RouterLink>
-        <RouterLink v-if="can('ADMIN')" to="/app/users" active-class="active">Users</RouterLink>
         <RouterLink v-if="can('ADMIN')" to="/app/products" active-class="active">Products</RouterLink>
+        <RouterLink to="/app/inventory" active-class="active">Inventory</RouterLink>
+        <RouterLink v-if="can('ADMIN')" to="/app/users" active-class="active">Users</RouterLink>
+        <RouterLink v-if="can('ADMIN')" to="/app/branches" active-class="active">Branches</RouterLink>
+        <RouterLink v-if="canAny(['ADMIN','BRANCH_MANAGER'])" to="/app/transfers" active-class="active">Transfer</RouterLink>
+        <RouterLink v-if="canAny(['ADMIN','BRANCH_MANAGER'])" to="/app/inventory/movements" active-class="active">Movement</RouterLink>
         <RouterLink v-if="canAny(['BRANCH_MANAGER','SALES'])" to="/app/orders" active-class="active">Orders</RouterLink>
         <RouterLink v-if="canAny(['BRANCH_MANAGER','SALES'])" to="/app/orders/reserved" active-class="active">Reserved Orders</RouterLink>
-        <RouterLink v-if="canAny(['ADMIN','BRANCH_MANAGER'])" to="/app/transfers" active-class="active">Transfers</RouterLink>
       </nav>
 
       <div style="margin-top: 18px;" class="card">

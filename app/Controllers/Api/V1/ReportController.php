@@ -167,4 +167,62 @@ class ReportController extends BaseApiController
             'low_stock_items' => $lowStock,
         ]);
     }
+
+    public function overallDashboard()
+    {
+        if ($resp = $this->guardRequestSize(65536)) {
+            return $resp;
+        }
+
+        $session = service('session');
+        $actorRole = strtoupper((string) ($session->get('role') ?? ''));
+        if ($actorRole !== 'ADMIN' && $actorRole !== 'SUPER_ADMIN') {
+            return $this->failMessage('Forbidden', ResponseInterface::HTTP_FORBIDDEN);
+        }
+
+        $db = db_connect();
+
+        // Sales totals across all branches
+        $salesToday = (float) ($db->table('orders')
+            ->selectSum('grand_total', 'sum')
+            ->where('status', 'SUBMITTED')
+            ->where('created_at >=', date('Y-m-d 00:00:00'))
+            ->where('created_at <=', date('Y-m-d 23:59:59'))
+            ->get()
+            ->getRowArray()['sum'] ?? 0);
+
+        $monthStart = date('Y-m-01 00:00:00');
+        $monthEnd = date('Y-m-t 23:59:59');
+
+        $salesMonth = (float) ($db->table('orders')
+            ->selectSum('grand_total', 'sum')
+            ->where('status', 'SUBMITTED')
+            ->where('created_at >=', $monthStart)
+            ->where('created_at <=', $monthEnd)
+            ->get()
+            ->getRowArray()['sum'] ?? 0);
+
+        $ordersMonth = (int) ($db->table('orders')
+            ->selectCount('id', 'cnt')
+            ->where('status', 'SUBMITTED')
+            ->where('created_at >=', $monthStart)
+            ->where('created_at <=', $monthEnd)
+            ->get()
+            ->getRowArray()['cnt'] ?? 0);
+
+        $ordersTotal = (int) ($db->table('orders')
+            ->selectCount('id', 'cnt')
+            ->where('status', 'SUBMITTED')
+            ->get()
+            ->getRowArray()['cnt'] ?? 0);
+
+        return $this->ok([
+            'stats' => [
+                'sales_today' => $salesToday,
+                'sales_month' => $salesMonth,
+                'orders_month' => $ordersMonth,
+                'orders_total' => $ordersTotal,
+            ],
+        ]);
+    }
 }

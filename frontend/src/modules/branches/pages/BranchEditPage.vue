@@ -25,16 +25,27 @@
       </div>
       <div class="grid2">
         <div class="field">
-          <label>Manager ID (optional)</label>
-          <input v-model.trim="form.managerId" />
-        </div>
-        <div class="field">
-          <label>Status</label>
-          <select v-model="form.status">
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="INACTIVE">INACTIVE</option>
+          <label>Manager Name (optional)</label>
+          <select v-model.number="selectedManagerId" :disabled="managersLoading || managers.length === 0" @change="syncManagerFields">
+            <option :value="0">— None —</option>
+            <option v-for="u in managers" :key="u.id" :value="u.id">{{ u.name }}</option>
           </select>
         </div>
+        <div class="field">
+          <label>Manager Email (optional)</label>
+          <select v-model.number="selectedManagerId" :disabled="managersLoading || managers.length === 0" @change="syncManagerFields">
+            <option :value="0">—</option>
+            <option v-for="u in managers" :key="u.id" :value="u.id">{{ u.email }}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Status</label>
+        <select v-model="form.status">
+          <option value="ACTIVE">ACTIVE</option>
+          <option value="INACTIVE">INACTIVE</option>
+        </select>
       </div>
 
       <div class="row">
@@ -50,6 +61,7 @@ import { onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { Branch } from '../../../types/models';
 import { branchesController } from '../branches.controller';
+import { usersController } from '../../users/users.controller';
 
 const route = useRoute();
 const router = useRouter();
@@ -60,16 +72,44 @@ const loading = ref(false);
 const saving = ref(false);
 const error = ref('');
 
+const managersLoading = ref(false);
+const managers = ref<Array<{ id: number; name: string; email: string }>>([]);
+const selectedManagerId = ref(0);
+
 const form = reactive({
   name: '',
   address: '',
-  managerId: '',
+  managerName: '',
+  managerEmail: '',
   status: 'ACTIVE' as Branch['status'],
 });
 
-function parseManagerId(v: string): number | undefined {
-  const n = Number.parseInt(v, 10);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
+async function loadManagers() {
+  managersLoading.value = true;
+  try {
+    const users = await usersController.list({ page: 1, per_page: 200, role: 'BRANCH_MANAGER', status: 'ACTIVE' });
+    managers.value = users
+      .filter((u: any) => (u?.id || 0) > 0)
+      .map((u: any) => ({ id: u.id, name: u.name, email: u.email }));
+  } catch (e) {
+    managers.value = [];
+  } finally {
+    managersLoading.value = false;
+  }
+}
+
+function syncManagerFields() {
+  const id = Number(selectedManagerId.value || 0);
+  if (id <= 0) {
+    form.managerName = '';
+    form.managerEmail = '';
+    return;
+  }
+
+  const u = managers.value.find((m) => m.id === id);
+  if (!u) return;
+  form.managerName = u.name;
+  form.managerEmail = u.email;
 }
 
 async function load() {
@@ -79,8 +119,13 @@ async function load() {
     const b = await branchesController.get(id);
     form.name = b.name;
     form.address = b.address;
-    form.managerId = b.manager_id ? String(b.manager_id) : '';
+    selectedManagerId.value = Number(b.manager_id || 0) || 0;
+    form.managerName = (b.manager_name as string) || '';
+    form.managerEmail = (b.manager_email as string) || '';
     form.status = b.status;
+
+    // If the selected manager is in the dropdown list, keep fields synced.
+    syncManagerFields();
   } catch (e: any) {
     error.value = e?.message || 'Failed to load branch';
   } finally {
@@ -90,12 +135,14 @@ async function load() {
 
 async function onSave() {
   error.value = '';
+  if (!confirm('Save changes to this branch?')) return;
   saving.value = true;
   try {
     await branchesController.update(id, {
       name: form.name,
       address: form.address,
-      manager_id: parseManagerId(form.managerId),
+      manager_name: form.managerName.trim() || undefined,
+      manager_email: form.managerEmail.trim() || undefined,
       status: form.status,
     });
     router.push('/app/branches');
@@ -106,5 +153,8 @@ async function onSave() {
   }
 }
 
-onMounted(load);
+onMounted(async () => {
+  await loadManagers();
+  await load();
+});
 </script>

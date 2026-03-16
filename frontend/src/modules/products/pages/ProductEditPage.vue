@@ -19,10 +19,6 @@
         <label>Name</label>
         <input v-model.trim="form.name" />
       </div>
-      <div class="field">
-        <label>SKU</label>
-        <input v-model.trim="form.sku" />
-      </div>
       <div class="grid2">
         <div class="field">
           <label>Cost Price</label>
@@ -72,7 +68,6 @@ const error = ref('');
 
 const form = reactive({
   name: '',
-  sku: '',
   cost: '',
   sale: '',
   tax: '0',
@@ -90,7 +85,6 @@ async function load() {
   try {
     const p = await productsController.get(id);
     form.name = p.name;
-    form.sku = p.sku;
     form.cost = String(p.cost_price);
     form.sale = String(p.sale_price);
     form.tax = String(p.tax_percentage);
@@ -104,11 +98,11 @@ async function load() {
 
 async function onSave() {
   error.value = '';
+  if (!confirm('Save changes to this product?')) return;
   saving.value = true;
   try {
     await productsController.update(id, {
       name: form.name,
-      sku: form.sku,
       cost_price: num(form.cost),
       sale_price: num(form.sale),
       tax_percentage: num(form.tax),

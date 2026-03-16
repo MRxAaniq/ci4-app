@@ -33,7 +33,10 @@
           <td class="muted">{{ b.address }}</td>
           <td><span class="badge" :class="b.status === 'ACTIVE' ? 'ok' : 'danger'">{{ b.status }}</span></td>
           <td>
-            <RouterLink class="btn" :to="`/app/branches/${b.id}/edit`">Edit</RouterLink>
+            <div style="display: flex; gap: 8px;">
+              <RouterLink class="btn" :to="`/app/branches/${b.id}/edit`">Edit</RouterLink>
+              <button v-if="canDelete" class="btn danger" :disabled="loading" @click="onDelete(b.id, b.name)">Delete</button>
+            </div>
           </td>
         </tr>
         <tr v-if="!loading && items.length === 0">
@@ -47,12 +50,16 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { useAuthStore } from '../../../stores/auth';
 import type { Branch } from '../../../types/models';
 import type { PaginationMeta } from '../../../types/pagination';
 import SearchBar from '../../../shared/components/SearchBar.vue';
 import PaginationBar from '../../../shared/components/PaginationBar.vue';
 import { branchesController } from '../branches.controller';
+
+const auth = useAuthStore();
+const canDelete = computed(() => auth.user?.role === 'ADMIN' || auth.user?.role === 'SUPER_ADMIN');
 
 const items = ref<Branch[]>([]);
 const pagination = ref<PaginationMeta | null>(null);
@@ -86,6 +93,20 @@ function onClear() {
 
 function onPage(page: number) {
   load(page);
+}
+
+async function onDelete(id: number, name: string) {
+  if (!confirm(`Delete branch "${name}"?`)) return;
+  error.value = '';
+  loading.value = true;
+  try {
+    await branchesController.remove(id);
+    await load(pagination.value?.page || 1);
+  } catch (e: any) {
+    error.value = e?.message || 'Failed to delete branch';
+  } finally {
+    loading.value = false;
+  }
 }
 
 onMounted(() => load(1));

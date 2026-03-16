@@ -13,6 +13,8 @@ export interface Branch {
   name: string;
   address: string;
   manager_id: number | null;
+  manager_name?: string | null;
+  manager_email?: string | null;
   status: 'ACTIVE' | 'INACTIVE';
   created_at?: string;
   updated_at?: string;

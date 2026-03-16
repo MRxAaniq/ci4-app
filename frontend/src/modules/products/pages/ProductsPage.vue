@@ -23,10 +23,6 @@
           <input v-model.trim="create.name" placeholder="Product name" />
         </div>
         <div class="field">
-          <label>SKU</label>
-          <input v-model.trim="create.sku" placeholder="SKU-001" />
-        </div>
-        <div class="field">
           <label>Cost Price</label>
           <input v-model.trim="create.cost" placeholder="10.50" />
         </div>
@@ -98,10 +94,6 @@
             <input v-model.trim="edit.name" />
           </div>
           <div class="field">
-            <label>SKU</label>
-            <input v-model.trim="edit.sku" />
-          </div>
-          <div class="field">
             <label>Cost Price</label>
             <input v-model.trim="edit.cost" />
           </div>
@@ -143,7 +135,6 @@ const error = ref('');
 
 const create = reactive({
   name: '',
-  sku: '',
   cost: '',
   sale: '',
   tax: '0',
@@ -153,7 +144,6 @@ const create = reactive({
 const editing = ref<Product | null>(null);
 const edit = reactive({
   name: '',
-  sku: '',
   cost: '',
   sale: '',
   tax: '0',
@@ -184,14 +174,12 @@ async function onCreate() {
   try {
     await productsController.create({
       name: create.name,
-      sku: create.sku,
       cost_price: num(create.cost),
       sale_price: num(create.sale),
       tax_percentage: num(create.tax),
       status: create.status,
     });
     create.name = '';
-    create.sku = '';
     create.cost = '';
     create.sale = '';
     create.tax = '0';
@@ -207,7 +195,6 @@ async function onCreate() {
 function startEdit(p: Product) {
   editing.value = p;
   edit.name = p.name;
-  edit.sku = p.sku;
   edit.cost = String(p.cost_price);
   edit.sale = String(p.sale_price);
   edit.tax = String(p.tax_percentage);
@@ -221,11 +208,11 @@ function cancelEdit() {
 async function onUpdate() {
   if (!editing.value) return;
   error.value = '';
+  if (!confirm('Save changes to this product?')) return;
   loading.value = true;
   try {
     await productsController.update(editing.value.id, {
       name: edit.name,
-      sku: edit.sku,
       cost_price: num(edit.cost),
       sale_price: num(edit.sale),
       tax_percentage: num(edit.tax),
@@ -242,6 +229,7 @@ async function onUpdate() {
 
 async function onDelete(p: Product) {
   error.value = '';
+  if (!confirm('Delete this product?')) return;
   loading.value = true;
   try {
     await productsController.remove(p.id);

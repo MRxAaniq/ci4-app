@@ -36,7 +36,10 @@ export const branchesService = {
     }
   },
 
-  async create(input: Pick<Branch, 'name' | 'address'> & Partial<Pick<Branch, 'manager_id' | 'status'>>): Promise<Branch> {
+  async create(
+    input: Pick<Branch, 'name' | 'address'> &
+      Partial<Pick<Branch, 'manager_id' | 'manager_name' | 'manager_email' | 'status'>>
+  ): Promise<Branch> {
     try {
       const resp = await apiClient.post('/api/v1/branches', input);
       return normalizeBranch(unwrapData<OneResponse>(resp.data).branch);
@@ -45,12 +48,23 @@ export const branchesService = {
     }
   },
 
-  async update(id: number, input: Partial<Pick<Branch, 'name' | 'address' | 'manager_id' | 'status'>>): Promise<Branch> {
+  async update(
+    id: number,
+    input: Partial<Pick<Branch, 'name' | 'address' | 'manager_id' | 'manager_name' | 'manager_email' | 'status'>>
+  ): Promise<Branch> {
     try {
       const resp = await apiClient.patch(`/api/v1/branches/${id}`, input);
       return normalizeBranch(unwrapData<OneResponse>(resp.data).branch);
     } catch (e) {
       throw new Error(apiErrorMessage(e, 'Failed to update branch'));
+    }
+  },
+
+  async remove(id: number): Promise<void> {
+    try {
+      await apiClient.delete(`/api/v1/branches/${id}`);
+    } catch (e) {
+      throw new Error(apiErrorMessage(e, 'Failed to delete branch'));
     }
   },
 };

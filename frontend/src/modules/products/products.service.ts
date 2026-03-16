@@ -6,7 +6,7 @@ import type { PaginationMeta } from '../../types/pagination';
 type ListResponse = { products: Product[]; pagination?: PaginationMeta };
 type OneResponse = { message: string; product: Product };
 
-type ProductUpsert = Pick<Product, 'name' | 'sku' | 'cost_price' | 'sale_price'> &
+type ProductUpsert = Pick<Product, 'name' | 'cost_price' | 'sale_price'> &
   Partial<Pick<Product, 'tax_percentage' | 'status'>>;
 
 export const productsService = {

@@ -33,6 +33,10 @@ type DashboardResponse = {
   low_stock_items: LowStockRow[];
 };
 
+type OverallDashboardResponse = {
+  stats: BranchDashboardStats;
+};
+
 export const reportsService = {
   async getBranchDashboard(branchId: number, params?: { low_stock_threshold?: number }): Promise<DashboardResponse> {
     try {
@@ -40,6 +44,15 @@ export const reportsService = {
       return unwrapData<DashboardResponse>(resp.data);
     } catch (e) {
       throw new Error(apiErrorMessage(e, 'Failed to load dashboard'));
+    }
+  },
+
+  async getOverallDashboard(): Promise<OverallDashboardResponse> {
+    try {
+      const resp = await apiClient.get('/api/v1/dashboard/overall');
+      return unwrapData<OverallDashboardResponse>(resp.data);
+    } catch (e) {
+      throw new Error(apiErrorMessage(e, 'Failed to load overall dashboard'));
     }
   },
 };

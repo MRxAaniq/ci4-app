@@ -7,6 +7,25 @@ use CodeIgniter\HTTP\ResponseInterface;
 
 class ProductController extends BaseApiController
 {
+    private function generateSku(ProductModel $model): string
+    {
+        for ($i = 0; $i < 10; $i++) {
+            try {
+                $rand = bin2hex(random_bytes(4));
+            } catch (\Throwable $e) {
+                $rand = dechex(time()) . (string) $i;
+            }
+
+            $sku = 'SKU-' . strtoupper($rand);
+            if (!$model->findBySku($sku)) {
+                return $sku;
+            }
+        }
+
+        // Fallback: time-based SKU (still unique enough for this app)
+        return 'SKU-' . strtoupper(dechex(time())) . '-' . (string) random_int(100, 999);
+    }
+
     public function index()
     {
         $page = max(1, (int)($this->request->getGet('page') ?? 1));
@@ -76,7 +95,7 @@ class ProductController extends BaseApiController
         $validation = service('validation');
         $validation->setRules([
             'name'           => 'required|max_length[200]',
-            'sku'            => 'required|max_length[80]',
+            'sku'            => 'permit_empty|max_length[80]',
             'cost_price'     => 'required|decimal',
             'sale_price'     => 'required|decimal',
             'tax_percentage' => 'permit_empty|decimal',
@@ -89,13 +108,18 @@ class ProductController extends BaseApiController
 
         $model = new ProductModel();
 
-        if ($model->findBySku((string)$payload['sku'])) {
+        $sku = trim((string)($payload['sku'] ?? ''));
+        if ($sku === '') {
+            $sku = $this->generateSku($model);
+        }
+
+        if ($model->findBySku($sku)) {
             return $this->failMessage('SKU already exists', ResponseInterface::HTTP_CONFLICT);
         }
 
         $id = (int)$model->insert([
             'name'           => (string)$payload['name'],
-            'sku'            => (string)$payload['sku'],
+            'sku'            => $sku,
             'cost_price'     => (float)$payload['cost_price'],
             'sale_price'     => (float)$payload['sale_price'],
             'tax_percentage' => isset($payload['tax_percentage']) ? (float)$payload['tax_percentage'] : 0.0,
@@ -120,7 +144,6 @@ class ProductController extends BaseApiController
         $validation = service('validation');
         $validation->setRules([
             'name'           => 'permit_empty|max_length[200]',
-            'sku'            => 'permit_empty|max_length[80]',
             'cost_price'     => 'permit_empty|decimal',
             'sale_price'     => 'permit_empty|decimal',
             'tax_percentage' => 'permit_empty|decimal',
@@ -137,14 +160,9 @@ class ProductController extends BaseApiController
             return $this->failMessage('Product not found', ResponseInterface::HTTP_NOT_FOUND);
         }
 
-        if (isset($payload['sku']) && (string)$payload['sku'] !== (string)$existing['sku']) {
-            if ($model->findBySku((string)$payload['sku'])) {
-                return $this->failMessage('SKU already exists', ResponseInterface::HTTP_CONFLICT);
-            }
-        }
-
+        // SKU is system-managed (auto-generated on create); keep it immutable.
         $update = array_intersect_key($payload, array_flip([
-            'name', 'sku', 'cost_price', 'sale_price', 'tax_percentage', 'status'
+            'name', 'cost_price', 'sale_price', 'tax_percentage', 'status'
         ]));
 
         if (empty($update)) {

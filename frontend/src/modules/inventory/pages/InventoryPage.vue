@@ -35,6 +35,7 @@
             <th>Price</th>
             <th>Tax %</th>
             <th>Status</th>
+            <th v-if="canWrite"></th>
           </tr>
         </thead>
         <tbody>
@@ -49,9 +50,13 @@
             <td>
               <span class="badge" :class="r.status === 'ACTIVE' ? 'ok' : 'danger'">{{ r.status }}</span>
             </td>
+            <td v-if="canWrite" style="display: flex; gap: 8px;">
+              <button class="btn" type="button" :disabled="loading" @click="onEditRow(r)">Edit</button>
+              <button class="btn danger" type="button" :disabled="loading" @click="onDeleteRow(r)">Delete</button>
+            </td>
           </tr>
           <tr v-if="!loading && rows.length === 0">
-            <td colspan="6" class="muted">No inventory rows.</td>
+            <td :colspan="canWrite ? 7 : 6" class="muted">No inventory rows.</td>
           </tr>
         </tbody>
       </table>
@@ -165,8 +170,7 @@ async function loadBranches() {
     branches.value = res.items;
 
     if (isManager.value && auth.user) {
-      const managed = branches.value.find((b) => b.manager_id === auth.user?.id);
-      branchId.value = managed?.id || 0;
+      branchId.value = branches.value[0]?.id || 0;
       return;
     }
 
@@ -243,6 +247,9 @@ async function onAdjust() {
     error.value = 'Select a product and enter a non-zero delta';
     return;
   }
+
+  if (!confirm('Adjust stock for this product?')) return;
+
   loading.value = true;
   try {
     await inventoryController.adjustStock(branchId.value, adjust.productId, adjust.delta, adjust.note || undefined);
@@ -251,6 +258,48 @@ async function onAdjust() {
     adjust.note = '';
   } catch (e: any) {
     error.value = e?.message || 'Failed to adjust stock';
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function onEditRow(r: InventoryRow) {
+  error.value = '';
+  const raw = prompt(`Set new quantity for ${r.name} (${r.sku})`, String(r.quantity));
+  if (raw === null) return;
+  const nextQty = Number.parseInt(raw.trim(), 10);
+  if (!Number.isFinite(nextQty) || nextQty < 0) {
+    error.value = 'Quantity must be a non-negative integer';
+    return;
+  }
+
+  const delta = nextQty - r.quantity;
+  if (delta === 0) return;
+
+  if (!confirm('Update inventory quantity?')) return;
+
+  loading.value = true;
+  try {
+    await inventoryController.adjustStock(branchId.value, r.product_id, delta, `Set quantity to ${nextQty}`);
+    await load();
+  } catch (e: any) {
+    error.value = e?.message || 'Failed to update inventory';
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function onDeleteRow(r: InventoryRow) {
+  error.value = '';
+  if (r.quantity <= 0) return;
+  if (!confirm(`Delete inventory row for ${r.name} (${r.sku})? This will clear its stock to 0.`)) return;
+
+  loading.value = true;
+  try {
+    await inventoryController.adjustStock(branchId.value, r.product_id, -r.quantity, 'Clear stock (delete inventory row)');
+    await load();
+  } catch (e: any) {
+    error.value = e?.message || 'Failed to delete inventory row';
   } finally {
     loading.value = false;
   }

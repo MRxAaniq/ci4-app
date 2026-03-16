@@ -24,6 +24,7 @@ $routes->group('api/v1', static function (RouteCollection $routes) {
 		$routes->get('branches/(:num)', 'Api\V1\BranchController::show/$1', ['filter' => 'role:ADMIN,BRANCH_MANAGER,SALES']);
 		$routes->post('branches', 'Api\V1\BranchController::create', ['filter' => 'role:ADMIN']);
 		$routes->patch('branches/(:num)', 'Api\V1\BranchController::update/$1', ['filter' => 'role:ADMIN']);
+		$routes->delete('branches/(:num)', 'Api\V1\BranchController::delete/$1', ['filter' => 'role:ADMIN']);
 
 		// Products
 		$routes->get('products', 'Api\V1\ProductController::index', ['filter' => 'role:ADMIN,BRANCH_MANAGER,SALES']);
@@ -41,8 +42,10 @@ $routes->group('api/v1', static function (RouteCollection $routes) {
 
 		// Reports / dashboard (branch-scoped)
 		$routes->get('branches/(:num)/dashboard', 'Api\V1\ReportController::branchDashboard/$1', ['filter' => 'role:ADMIN,BRANCH_MANAGER']);
+		$routes->get('dashboard/overall', 'Api\V1\ReportController::overallDashboard', ['filter' => 'role:ADMIN']);
 
 		// Users (admin-only)
+		$routes->get('users', 'Api\V1\UserController::index', ['filter' => 'role:ADMIN']);
 		$routes->post('users', 'Api\V1\UserController::create', ['filter' => 'role:ADMIN']);
 
 		// Orders

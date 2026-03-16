@@ -106,8 +106,7 @@ async function loadBranches() {
     const queryBranchId = Number.isFinite(qBranch) && qBranch > 0 ? qBranch : 0;
 
     if (isManager.value && auth.user) {
-      const managed = branches.value.find((b) => b.manager_id === auth.user?.id);
-      branchId.value = managed?.id || 0;
+      branchId.value = branches.value[0]?.id || 0;
       return;
     }
 
@@ -149,6 +148,7 @@ function clearProductQuery() {
 
 async function onSubmit() {
   error.value = '';
+  if (!confirm('Add stock to this branch?')) return;
   loading.value = true;
   try {
     await inventoryController.addStock(branchId.value, productId.value, quantity.value, note.value.trim() || undefined);
