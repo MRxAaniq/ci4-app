@@ -79,6 +79,10 @@ class OrderService
         $orderModel = new OrderModel($this->db);
         $orderItemModel = new OrderItemModel($this->db);
 
+        if (!$this->db->tableExists('inventory_reservations')) {
+            throw new DatabaseException('Inventory reservations table is missing. Run migrations (php spark migrate).');
+        }
+
         $this->db->transBegin();
 
         try {
@@ -134,7 +138,11 @@ class OrderService
             }
 
             // Release reservations now that inventory has been deducted.
-            $this->db->table('inventory_reservations')->where('order_id', $orderId)->delete();
+            $ok = $this->db->table('inventory_reservations')->where('order_id', $orderId)->delete();
+            if ($ok === false) {
+                $err = $this->db->error();
+                throw new DatabaseException('Failed to release reservations: ' . (string) ($err['message'] ?? 'unknown'));
+            }
 
             $orderModel->update($orderId, [
                 'status' => 'SUBMITTED',
@@ -182,6 +190,10 @@ class OrderService
         $orderModel = new OrderModel($this->db);
         $orderItemModel = new OrderItemModel($this->db);
         $productModel = new ProductModel($this->db);
+
+        if (!$this->db->tableExists('inventory_reservations')) {
+            throw new DatabaseException('Inventory reservations table is missing. Run migrations (php spark migrate).');
+        }
 
         $this->db->transBegin();
 
@@ -292,13 +304,18 @@ class OrderService
 
             // Reserve inventory for this pending order (no inventory change and no movements).
             foreach ($normalized as $row) {
-                $this->db->table('inventory_reservations')->insert([
+                $ok = $this->db->table('inventory_reservations')->insert([
                     'branch_id'  => $branchId,
                     'product_id' => (int) $row['product_id'],
                     'order_id'   => $orderId,
                     'quantity'   => (int) $row['quantity'],
                     'created_at' => date('Y-m-d H:i:s'),
                 ]);
+
+                if ($ok === false) {
+                    $err = $this->db->error();
+                    throw new DatabaseException('Failed to reserve inventory: ' . (string) ($err['message'] ?? 'unknown'));
+                }
             }
 
             $orderModel->update($orderId, [
@@ -308,6 +325,14 @@ class OrderService
                 // Keep PENDING until approved.
                 'status'      => 'PENDING',
             ]);
+
+            // Defensive check: if DB schema doesn't support PENDING (e.g., missing ENUM migration),
+            // MySQL may coerce it to another value without throwing.
+            $statusRow = $this->db->table('orders')->select('status')->where('id', $orderId)->get()->getRowArray();
+            $storedStatus = strtoupper((string) ($statusRow['status'] ?? ''));
+            if ($storedStatus !== 'PENDING') {
+                throw new DatabaseException('Order status PENDING is not supported by the database schema. Run migrations (php spark migrate).');
+            }
 
             $this->db->transCommit();
 

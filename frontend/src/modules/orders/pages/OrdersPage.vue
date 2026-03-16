@@ -18,15 +18,6 @@
 
       <form class="form" @submit.prevent="onSubmit">
         <div class="field">
-          <label>Search Branch</label>
-          <div class="row">
-            <input v-model.trim="branchQuery" placeholder="Search branches" @keydown.enter.prevent="loadBranches" />
-            <button class="btn" type="button" :disabled="branchesLoading" @click="loadBranches">Search</button>
-            <button class="btn" type="button" :disabled="branchesLoading" @click="clearBranchQuery">Clear</button>
-          </div>
-        </div>
-
-        <div class="field">
           <label>Branch</label>
           <select v-model.number="branchId" :disabled="branchLocked || branchesLoading">
             <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
@@ -133,7 +124,6 @@ const products = ref<Product[]>([]);
 const branchesLoading = ref(false);
 const productsLoading = ref(false);
 const productQuery = ref('');
-const branchQuery = ref('');
 
 const branchLocked = computed(() => auth.user?.role === 'SALES');
 const branchId = ref<number>(auth.user?.branch_id || 0);
@@ -202,7 +192,8 @@ function removeLine(idx: number) {
 async function loadBranches() {
   branchesLoading.value = true;
   try {
-    const res = await branchesController.list({ page: 1, per_page: 50, q: branchQuery.value.trim() || undefined });
+    // Branch list is already scoped by the API based on role (manager/sales see only their branch).
+    const res = await branchesController.list({ page: 1, per_page: 100 });
     branches.value = res.items;
     if (!branchId.value) branchId.value = auth.user?.branch_id || branches.value[0]?.id || 0;
   } catch (e: any) {
@@ -210,11 +201,6 @@ async function loadBranches() {
   } finally {
     branchesLoading.value = false;
   }
-}
-
-function clearBranchQuery() {
-  branchQuery.value = '';
-  loadBranches();
 }
 
 async function loadProducts() {

@@ -95,7 +95,7 @@ const error = ref('');
 
 const isManager = computed(() => auth.user?.role === 'BRANCH_MANAGER');
 const isSales = computed(() => auth.user?.role === 'SALES');
-const branchLocked = computed(() => isSales.value || (isManager.value && branchId.value > 0));
+const branchLocked = computed(() => isSales.value || isManager.value);
 const canApprove = computed(() => isManager.value);
 
 async function loadBranches() {
@@ -104,18 +104,13 @@ async function loadBranches() {
     const res = await branchesController.list({ page: 1, per_page: 100 });
     branches.value = res.items;
 
-    if (isManager.value && auth.user) {
-      const managed = branches.value.find((b) => b.manager_id === auth.user?.id);
-      branchId.value = managed?.id || 0;
-      return;
-    }
-
-    if (isSales.value && auth.user) {
-      branchId.value = auth.user.branch_id || 0;
-      return;
-    }
-
-    if (!branchId.value) branchId.value = branches.value[0]?.id || 0;
+    // API is already scoped by role:
+    // - BRANCH_MANAGER only sees their managed branch
+    // - SALES only sees their assigned branch
+    // So we can safely default to the first item.
+    const firstId = Number((branches.value[0] as any)?.id || 0);
+    if (!branchId.value) branchId.value = firstId;
+    if (isManager.value || isSales.value) branchId.value = firstId;
   } finally {
     branchesLoading.value = false;
   }

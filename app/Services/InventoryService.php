@@ -13,6 +13,10 @@ class InventoryService
 
     public function getReservedQty(int $branchId, int $productId): int
     {
+        if (!$this->db->tableExists('inventory_reservations')) {
+            throw new DatabaseException('Inventory reservations table is missing. Run migrations (php spark migrate).');
+        }
+
         $row = $this->db->table('inventory_reservations')
             ->selectSum('quantity', 'qty')
             ->where('branch_id', $branchId)
@@ -25,6 +29,10 @@ class InventoryService
 
     public function getReservedQtyForOrder(int $orderId, int $productId): int
     {
+        if (!$this->db->tableExists('inventory_reservations')) {
+            throw new DatabaseException('Inventory reservations table is missing. Run migrations (php spark migrate).');
+        }
+
         $row = $this->db->table('inventory_reservations')
             ->selectSum('quantity', 'qty')
             ->where('order_id', $orderId)
