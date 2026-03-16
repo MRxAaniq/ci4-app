@@ -1,0 +1,39 @@
+services:
+  db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_DATABASE: ims
+      MYSQL_USER: ims
+      MYSQL_PASSWORD: ims_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build:
+      context: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      CI_ENVIRONMENT: development
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ims
+      DB_USERNAME: ims
+      DB_PASSWORD: ims_password
+      # Set to 1 to auto-seed demo users/products/inventory on startup
+      SEED_DEV: 1
+    ports:
+      - "8080:80"
+
+volumes:
+  db_data:
